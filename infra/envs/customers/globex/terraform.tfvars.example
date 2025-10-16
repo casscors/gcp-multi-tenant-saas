@@ -1,0 +1,45 @@
+# Globex customer environment configuration
+# Copy this file to terraform.tfvars and fill in your values
+
+customer_id = "globex"
+project_id  = "proj-globex-prod"
+org_id      = "your-org-id"
+billing_account = "your-billing-account-id"
+platform_project_id = "your-platform-project-id"
+region      = "us-central1"
+
+# Artifact Registry configuration
+artifact_repo_location = "us-central1"
+artifact_repo_name     = "apps"
+image_name            = "gcp-app"
+image_tag             = "v1.0.0"
+
+# Cloud Run configuration
+cloud_run_service_name = "app"
+
+# Secrets configuration (for hybrid cloud, many clusters)
+secrets = {
+  "APP_CONFIG" = {
+    secret_id = "app-config"
+    env_var   = "APP_CONFIG"
+  }
+  "DATABASE_URL" = {
+    secret_id = "db-url"
+    env_var   = "DATABASE_URL"
+  }
+  "CLUSTER_CONFIG" = {
+    secret_id = "cluster-config"
+    env_var   = "CLUSTER_CONFIG"
+  }
+  "HYBRID_CLOUD_CONFIG" = {
+    secret_id = "hybrid-cloud-config"
+    env_var   = "HYBRID_CLOUD_CONFIG"
+  }
+  "NETWORK_CONFIG" = {
+    secret_id = "network-config"
+    env_var   = "NETWORK_CONFIG"
+  }
+}
+
+# Deployer service account (from platform environment)
+deployer_sa_email = "ci-terraform@your-platform-project-id.iam.gserviceaccount.com"

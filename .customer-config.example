@@ -1,0 +1,54 @@
+# Customer Configuration Template
+# Copy this file to .customer-config and customize for your deployment
+#
+# Usage:
+#   cp .customer-config.example .customer-config
+#   # Edit .customer-config with your values
+#   ./scripts/setup-customers.sh
+#
+# This file is used by setup-customers.sh to replace generic customer names
+# (acme-llc, globex) with your actual customer identifiers throughout the repo
+
+# ============================================================================
+# CUSTOMER A CONFIGURATION
+# ============================================================================
+# The first customer example (currently uses "acme-llc" as placeholder)
+CUSTOMER_A_NAME="customer-a"
+CUSTOMER_A_PROJECT="proj-customer-a-prod"
+CUSTOMER_A_DESCRIPTION="Customer A - Multi-website deployment"
+
+# Secrets for Customer A (used in GitHub Actions secrets and Secret Manager)
+CUSTOMER_A_SECRET_1="WEBSITE_1_CONFIG"
+CUSTOMER_A_SECRET_2="WEBSITE_2_CONFIG"
+
+# ============================================================================
+# CUSTOMER B CONFIGURATION  
+# ============================================================================
+# The second customer example (currently uses "globex" as placeholder)
+CUSTOMER_B_NAME="customer-b"
+CUSTOMER_B_PROJECT="proj-customer-b-prod"
+CUSTOMER_B_DESCRIPTION="Customer B - Hybrid cloud deployment"
+
+# Secrets for Customer B (used in GitHub Actions secrets and Secret Manager)
+CUSTOMER_B_SECRET_1="CLUSTER_CONFIG"
+CUSTOMER_B_SECRET_2="HYBRID_CLOUD_CONFIG"
+CUSTOMER_B_SECRET_3="NETWORK_CONFIG"
+
+# ============================================================================
+# PLATFORM CONFIGURATION
+# ============================================================================
+PLATFORM_PROJECT_ID="your-platform-project"
+STAGING_PROJECT_ID="your-staging-project"
+
+# GitHub repository
+GITHUB_ORG="your-github-org"
+GITHUB_REPO="your-repo-name"
+
+# ============================================================================
+# NOTES
+# ============================================================================
+# - Customer names should be lowercase with hyphens (e.g., "acme-corp")
+# - Project IDs must follow GCP naming: lowercase, hyphens, 6-30 chars
+# - After running setup-customers.sh, the generic names will be replaced
+# - You can add more customers by copying the customer directory structure
+

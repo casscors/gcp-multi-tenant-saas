@@ -1,0 +1,90 @@
+name: Deploy to Staging
+
+on:
+  push:
+    branches: [ staging ]
+  workflow_dispatch:
+
+env:
+  REGION: us-central1
+  PLATFORM_PROJECT_ID: ${{ secrets.PLATFORM_PROJECT_ID }}
+  STAGING_PROJECT_ID: ${{ secrets.STAGING_PROJECT_ID }}
+  ARTIFACT_REPO_NAME: apps
+  IMAGE_NAME: gcp-app
+
+jobs:
+  deploy-staging:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
+
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+
+    - name: Generate image tag
+      id: image-tag
+      run: |
+        SHORT_SHA=$(echo ${{ github.sha }} | cut -c1-7)
+        echo "tag=staging-$SHORT_SHA" >> $GITHUB_OUTPUT
+
+    - name: Authenticate to Google Cloud
+      uses: google-github-actions/auth@v2
+      with:
+        workload_identity_provider: ${{ secrets.WIF_PROVIDER }}
+        service_account: ${{ secrets.WIF_SERVICE_ACCOUNT }}
+
+    - name: Set up Cloud SDK
+      uses: google-github-actions/setup-gcloud@v2
+
+    - name: Configure Docker for Artifact Registry
+      run: |
+        gcloud auth configure-docker ${{ env.REGION }}-docker.pkg.dev
+
+    - name: Build container image
+      run: |
+        docker build -t ${{ env.REGION }}-docker.pkg.dev/${{ env.PLATFORM_PROJECT_ID }}/${{ env.ARTIFACT_REPO_NAME }}/${{ env.IMAGE_NAME }}:${{ steps.image-tag.outputs.tag }} ./app
+
+    - name: Push image to Artifact Registry
+      run: |
+        docker push ${{ env.REGION }}-docker.pkg.dev/${{ env.PLATFORM_PROJECT_ID }}/${{ env.ARTIFACT_REPO_NAME }}/${{ env.IMAGE_NAME }}:${{ steps.image-tag.outputs.tag }}
+
+    - name: Add secret versions to Secret Manager
+      run: |
+        # Add/update secret versions from GitHub Secrets
+        if [ -n "${{ secrets.APP_CONFIG }}" ]; then
+          echo "${{ secrets.APP_CONFIG }}" | gcloud secrets versions add app-config --data-file=- --project=${{ env.STAGING_PROJECT_ID }}
+        fi
+        if [ -n "${{ secrets.DATABASE_URL }}" ]; then
+          echo "${{ secrets.DATABASE_URL }}" | gcloud secrets versions add db-url --data-file=- --project=${{ env.STAGING_PROJECT_ID }}
+        fi
+
+    - name: Terraform Init
+      run: |
+        cd infra/envs/staging
+        terraform init
+
+    - name: Terraform Plan
+      run: |
+        cd infra/envs/staging
+        terraform plan -var="image_tag=${{ steps.image-tag.outputs.tag }}"
+
+    - name: Terraform Apply
+      run: |
+        cd infra/envs/staging
+        terraform apply -auto-approve -var="image_tag=${{ steps.image-tag.outputs.tag }}"
+
+    - name: Get Cloud Run URL
+      id: cloud-run-url
+      run: |
+        cd infra/envs/staging
+        URL=$(terraform output -raw cloud_run_url)
+        echo "url=$URL" >> $GITHUB_OUTPUT
+
+    - name: Output deployment information
+      run: |
+        echo "🚀 Staging deployment completed!"
+        echo "📦 Image: ${{ env.REGION }}-docker.pkg.dev/${{ env.PLATFORM_PROJECT_ID }}/${{ env.ARTIFACT_REPO_NAME }}/${{ env.IMAGE_NAME }}:${{ steps.image-tag.outputs.tag }}"
+        echo "🌐 URL: ${{ steps.cloud-run-url.outputs.url }}"
+        echo "📊 Project: ${{ env.STAGING_PROJECT_ID }}"

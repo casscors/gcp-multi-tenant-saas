@@ -1,0 +1,87 @@
+# Shared Terraform variables example
+# Copy this file to shared.tfvars and fill in your values
+# This file contains common defaults used across environments
+
+# Organization and billing
+org_id          = "your-org-id"
+billing_account = "your-billing-account-id"
+
+# Platform project
+platform_project_id = "your-platform-project-id"
+
+# Staging project
+staging_project_id = "your-staging-project-id"
+
+# Common regions
+region = "us-central1"
+
+# Artifact Registry configuration
+artifact_repo_location = "us-central1"
+artifact_repo_name     = "apps"
+image_name            = "gcp-app"
+
+# Cloud Run defaults
+min_instances = 1
+max_instances = 10
+cpu          = "1"
+memory       = "512Mi"
+concurrency = 80
+
+# CI/CD service account
+deployer_sa_email = "ci-terraform@your-platform-project-id.iam.gserviceaccount.com"
+
+# Common secrets structure
+# Note: Secret values are managed outside Terraform via CI/CD or manual processes
+common_secrets = {
+  "APP_CONFIG" = {
+    secret_id = "app-config"
+    env_var   = "APP_CONFIG"
+  }
+  "DATABASE_URL" = {
+    secret_id = "db-url"
+    env_var   = "DATABASE_URL"
+  }
+}
+
+# Customer-specific secrets
+nicole_secrets = {
+  "APP_CONFIG" = {
+    secret_id = "app-config"
+    env_var   = "APP_CONFIG"
+  }
+  "DATABASE_URL" = {
+    secret_id = "db-url"
+    env_var   = "DATABASE_URL"
+  }
+  "WEBSITE_1_CONFIG" = {
+    secret_id = "website-1-config"
+    env_var   = "WEBSITE_1_CONFIG"
+  }
+  "WEBSITE_2_CONFIG" = {
+    secret_id = "website-2-config"
+    env_var   = "WEBSITE_2_CONFIG"
+  }
+}
+
+dd_secrets = {
+  "APP_CONFIG" = {
+    secret_id = "app-config"
+    env_var   = "APP_CONFIG"
+  }
+  "DATABASE_URL" = {
+    secret_id = "db-url"
+    env_var   = "DATABASE_URL"
+  }
+  "CLUSTER_CONFIG" = {
+    secret_id = "cluster-config"
+    env_var   = "CLUSTER_CONFIG"
+  }
+  "HYBRID_CLOUD_CONFIG" = {
+    secret_id = "hybrid-cloud-config"
+    env_var   = "HYBRID_CLOUD_CONFIG"
+  }
+  "NETWORK_CONFIG" = {
+    secret_id = "network-config"
+    env_var   = "NETWORK_CONFIG"
+  }
+}

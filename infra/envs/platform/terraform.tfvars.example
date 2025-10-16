@@ -1,0 +1,17 @@
+# Platform environment configuration
+# Copy this file to terraform.tfvars and fill in your values
+
+platform_project_id = "your-platform-project-id"
+org_id              = "your-org-id"
+billing_account     = "your-billing-account-id"
+region              = "us-central1"
+
+# GitHub repository information
+github_org  = "your-github-org"
+github_repo = "your-repo-name"
+
+# Artifact Registry configuration
+artifact_repo_name = "apps"
+
+# Terraform state bucket
+state_bucket_name = "gcp-terraform-state-bucket"

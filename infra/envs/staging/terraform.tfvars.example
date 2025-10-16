@@ -1,0 +1,30 @@
+# Staging environment configuration
+# Copy this file to terraform.tfvars and fill in your values
+
+staging_project_id = "your-staging-project-id"
+platform_project_id = "your-platform-project-id"
+region              = "us-central1"
+
+# Artifact Registry configuration
+artifact_repo_location = "us-central1"
+artifact_repo_name     = "apps"
+image_name            = "gcp-app"
+image_tag             = "staging-latest"
+
+# Cloud Run configuration
+cloud_run_service_name = "app-staging"
+
+# Secrets configuration
+secrets = {
+  "APP_CONFIG" = {
+    secret_id = "app-config"
+    env_var   = "APP_CONFIG"
+  }
+  "DATABASE_URL" = {
+    secret_id = "db-url"
+    env_var   = "DATABASE_URL"
+  }
+}
+
+# Deployer service account (from platform environment)
+deployer_sa_email = "ci-terraform@your-platform-project-id.iam.gserviceaccount.com"

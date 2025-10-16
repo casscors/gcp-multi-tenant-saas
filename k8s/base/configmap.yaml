@@ -1,0 +1,10 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: app-config
+  labels:
+    app: app
+data:
+  customer-id: "placeholder"
+  environment: "production"
+  log-level: "info"

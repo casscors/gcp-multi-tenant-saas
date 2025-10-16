@@ -1,0 +1,41 @@
+# Acme LLC customer environment configuration
+# Copy this file to terraform.tfvars and fill in your values
+
+customer_id = "acme-llc"
+project_id  = "proj-acme-llc-prod"
+org_id      = "your-org-id"
+billing_account = "your-billing-account-id"
+platform_project_id = "your-platform-project-id"
+region      = "us-central1"
+
+# Artifact Registry configuration
+artifact_repo_location = "us-central1"
+artifact_repo_name     = "apps"
+image_name            = "gcp-app"
+image_tag             = "v1.0.0"
+
+# Cloud Run configuration
+cloud_run_service_name = "app"
+
+# Secrets configuration (for 2 websites)
+secrets = {
+  "APP_CONFIG" = {
+    secret_id = "app-config"
+    env_var   = "APP_CONFIG"
+  }
+  "DATABASE_URL" = {
+    secret_id = "db-url"
+    env_var   = "DATABASE_URL"
+  }
+  "WEBSITE_1_CONFIG" = {
+    secret_id = "website-1-config"
+    env_var   = "WEBSITE_1_CONFIG"
+  }
+  "WEBSITE_2_CONFIG" = {
+    secret_id = "website-2-config"
+    env_var   = "WEBSITE_2_CONFIG"
+  }
+}
+
+# Deployer service account (from platform environment)
+deployer_sa_email = "ci-terraform@your-platform-project-id.iam.gserviceaccount.com"

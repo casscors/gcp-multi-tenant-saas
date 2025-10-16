@@ -1,0 +1,124 @@
+name: Deploy to Production
+
+on:
+  push:
+    tags:
+      - 'deploy-prod-*-*'
+  workflow_dispatch:
+
+env:
+  REGION: us-central1
+  PLATFORM_PROJECT_ID: ${{ secrets.PLATFORM_PROJECT_ID }}
+  ARTIFACT_REPO_NAME: apps
+  IMAGE_NAME: gcp-app
+
+jobs:
+  deploy-production:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
+
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+
+    - name: Parse deployment tag
+      id: parse-tag
+      run: |
+        TAG="${{ github.ref_name }}"
+        if [[ $TAG =~ ^deploy-prod-([a-z0-9-]+)-(.+)$ ]]; then
+          CUSTOMER_ID="${BASH_REMATCH[1]}"
+          VERSION="${BASH_REMATCH[2]}"
+          echo "customer-id=$CUSTOMER_ID" >> $GITHUB_OUTPUT
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "project-id=proj-$CUSTOMER_ID-prod" >> $GITHUB_OUTPUT
+        else
+          echo "❌ Invalid tag format. Expected: deploy-prod-<customer-id>-<version>"
+          exit 1
+        fi
+
+    - name: Authenticate to Google Cloud
+      uses: google-github-actions/auth@v2
+      with:
+        workload_identity_provider: ${{ secrets.WIF_PROVIDER }}
+        service_account: ${{ secrets.WIF_SERVICE_ACCOUNT }}
+
+    - name: Set up Cloud SDK
+      uses: google-github-actions/setup-gcloud@v2
+
+    - name: Configure Docker for Artifact Registry
+      run: |
+        gcloud auth configure-docker ${{ env.REGION }}-docker.pkg.dev
+
+    - name: Verify image exists in Artifact Registry
+      run: |
+        IMAGE_URL="${{ env.REGION }}-docker.pkg.dev/${{ env.PLATFORM_PROJECT_ID }}/${{ env.ARTIFACT_REPO_NAME }}/${{ env.IMAGE_NAME }}:${{ steps.parse-tag.outputs.version }}"
+        if ! gcloud artifacts docker images describe $IMAGE_URL --quiet; then
+          echo "❌ Image $IMAGE_URL not found in Artifact Registry"
+          echo "Please ensure the image with tag ${{ steps.parse-tag.outputs.version }} exists"
+          exit 1
+        fi
+        echo "✅ Image $IMAGE_URL found in Artifact Registry"
+
+    - name: Add customer secret versions to Secret Manager
+      run: |
+        PROJECT_ID="${{ steps.parse-tag.outputs.project-id }}"
+        CUSTOMER_ID="${{ steps.parse-tag.outputs.customer-id }}"
+        
+        echo "📝 Adding secrets to $PROJECT_ID for customer: $CUSTOMER_ID"
+        
+        # Add/update common secret versions from GitHub Secrets
+        if [ -n "${{ secrets.APP_CONFIG }}" ]; then
+          echo "${{ secrets.APP_CONFIG }}" | gcloud secrets versions add app-config --data-file=- --project=$PROJECT_ID || echo "⚠️  app-config secret not found or already exists"
+        fi
+        if [ -n "${{ secrets.DATABASE_URL }}" ]; then
+          echo "${{ secrets.DATABASE_URL }}" | gcloud secrets versions add db-url --data-file=- --project=$PROJECT_ID || echo "⚠️  db-url secret not found or already exists"
+        fi
+        
+        # Add customer-specific secrets dynamically
+        # This section attempts to add secrets based on what's defined in GitHub Secrets
+        # Secret names should match the pattern used in terraform.tfvars for each customer
+        
+        # Try to add all possible customer-specific secrets (will fail gracefully if not found)
+        for secret_name in WEBSITE_1_CONFIG WEBSITE_2_CONFIG CLUSTER_CONFIG HYBRID_CLOUD_CONFIG NETWORK_CONFIG; do
+          secret_value="${!secret_name}"
+          if [ -n "$secret_value" ]; then
+            secret_id=$(echo "$secret_name" | tr '[:upper:]_' '[:lower:]-')
+            echo "  Adding $secret_id..."
+            echo "$secret_value" | gcloud secrets versions add "$secret_id" --data-file=- --project=$PROJECT_ID 2>/dev/null || echo "  ⚠️  $secret_id not configured for this customer (skipping)"
+          fi
+        done
+        
+        echo "✅ Secrets updated for $CUSTOMER_ID"
+
+    - name: Terraform Init
+      run: |
+        cd infra/envs/customers/${{ steps.parse-tag.outputs.customer-id }}
+        terraform init
+
+    - name: Terraform Plan
+      run: |
+        cd infra/envs/customers/${{ steps.parse-tag.outputs.customer-id }}
+        terraform plan -var="image_tag=${{ steps.parse-tag.outputs.version }}"
+
+    - name: Terraform Apply
+      run: |
+        cd infra/envs/customers/${{ steps.parse-tag.outputs.customer-id }}
+        terraform apply -auto-approve -var="image_tag=${{ steps.parse-tag.outputs.version }}"
+
+    - name: Get Cloud Run URL
+      id: cloud-run-url
+      run: |
+        cd infra/envs/customers/${{ steps.parse-tag.outputs.customer-id }}
+        URL=$(terraform output -raw cloud_run_url)
+        echo "url=$URL" >> $GITHUB_OUTPUT
+
+    - name: Output deployment information
+      run: |
+        echo "🚀 Production deployment completed!"
+        echo "👤 Customer: ${{ steps.parse-tag.outputs.customer-id }}"
+        echo "📦 Image: ${{ env.REGION }}-docker.pkg.dev/${{ env.PLATFORM_PROJECT_ID }}/${{ env.ARTIFACT_REPO_NAME }}/${{ env.IMAGE_NAME }}:${{ steps.parse-tag.outputs.version }}"
+        echo "🌐 URL: ${{ steps.cloud-run-url.outputs.url }}"
+        echo "📊 Project: ${{ steps.parse-tag.outputs.project-id }}"
+        echo "🏷️  Version: ${{ steps.parse-tag.outputs.version }}"
