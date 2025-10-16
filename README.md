@@ -30,7 +30,7 @@
 
 
 Recommended repository and Terraform structure
-Root at: ~/Developer/GCP/<your-repo-name>
+Root at: ~/Developer/GCP/`<your-repo-name>`
 - app/
   - Dockerfile
   - src/... (your app)
@@ -64,7 +64,7 @@ Root at: ~/Developer/GCP/<your-repo-name>
       - backend.tf
       - terraform.tfvars.example
     - customers/
-      - <customer-id>/  # e.g., acme-llc, globex
+      - `<customer-id>`/  # e.g., acme-llc, globex
         - main.tf (calls customer-stamp, typically create_project=true)
         - variables.tf
         - providers.tf
@@ -252,15 +252,15 @@ Side effects
 - Secrets must exist in the staging project Secret Manager with versions; CI can create/update versions from GitHub Secrets.
 
 
-Customer environments (infra/envs/customers/<id>)
+Customer environments (infra/envs/customers/`<id>`)
 Files and logic
 - providers.tf
   - provider "google" default will point to var.project_id after project exists; for first run, can point to platform SA with resourcemanager permissions; Terraform can still create project using google provider with credentials at org scope
   - provider "google" alias = "platform" project = var.platform_project_id
-- backend.tf for remote state; use key prefix customers/<id>
+- backend.tf for remote state; use key prefix customers/`<id>`
 - variables.tf
   - customer_id
-  - project_id (derived naming like cust-<id>-prod)
+  - project_id (derived naming like cust-`<id>`-prod)
   - org_id, billing_account (for project creation)
   - platform_project_id, region, artifact_repo_name/location, image_name
   - cloud_run_service_name default "app"
@@ -311,13 +311,13 @@ Common elements for both pipelines
 - Use Terraform with GCS backend; provide -backend-config or rely on backend.tf committed in envs.
 
 Staging pipeline (trigger: push to staging branch)
-1) Checkout repository. Derive image tag (e.g., staging-<shortsha>).
+1) Checkout repository. Derive image tag (e.g., staging-`<shortsha>`).
 2) OIDC authenticate to GCP WIF and impersonate ci-terraform@platform.
 3) Build container:
    - docker build -t ${REGION}-docker.pkg.dev/${PLATFORM_PROJECT}/${REPO}/${IMAGE_NAME}:${TAG} .
 4) Push image to Artifact Registry.
 5) Ensure staging secrets exist in Secret Manager (only metadata defined in Terraform; versions managed outside TF). Optionally add versions from GitHub Actions Secrets:
-   - gcloud secrets versions add app-config --data-file=<(printenv APP_CONFIG)
+   - gcloud secrets versions add app-config --data-file=\<(printenv APP_CONFIG)
 6) Terraform apply envs/platform (first time only) is done beforehand; here:
    - cd infra/envs/staging
    - terraform init (GCS backend)
@@ -325,7 +325,7 @@ Staging pipeline (trigger: push to staging branch)
    - This updates the Cloud Run service to the new image tag; min-instances = 1 ensures no cold starts.
 7) Output the Cloud Run URL for visibility.
 
-Production pipeline (trigger: push of a tag deploy-prod-<customer-id>-<version>)
+Production pipeline (trigger: push of a tag deploy-prod-`<customer-id>`-`<version>`)
 1) Checkout repository. Parse tag into:
    - CUSTOMER_ID and VERSION. Enforce regex ^deploy-prod-([a-z0-9-]+)-(.+)$
 2) OIDC authenticate to GCP WIF and impersonate ci-terraform@platform.
@@ -367,8 +367,8 @@ Secrets and “build in public” model
 Lifecycle of a new customer (best-practice workflow)
 1) Naming and configuration
    - Choose customer_id (lowercase, hyphenated) to fit GCP naming constraints.
-   - Create infra/envs/customers/<customer-id>/ with main.tf, variables.tf, backend.tf.
-   - Set project_id convention, e.g., proj-<customer-id>-prod.
+   - Create infra/envs/customers/`<customer-id>`/ with main.tf, variables.tf, backend.tf.
+   - Set project_id convention, e.g., proj-`<customer-id>`-prod.
 2) Platform-side prep (one-time per repo/organization)
    - Ensure platform env is applied: WIF, Artifact Registry, state bucket.
 3) Instantiate customer infrastructure
@@ -380,12 +380,12 @@ Lifecycle of a new customer (best-practice workflow)
      - Cross-project IAM to allow AR pulls.
 4) Add secret versions
    - From CI: store secrets in GitHub Actions Secrets and run a workflow dispatch or on tag to push them into the customer project Secret Manager:
-     - gcloud secrets versions add SECRET_NAME --project=proj-<cust>-prod --data-file=<(printenv SECRET_VALUE)
+     - gcloud secrets versions add SECRET_NAME --project=proj-`<cust>`-prod --data-file=\<(printenv SECRET_VALUE)
    - Alternatively, locally via .tfvars + a small script (do not commit values).
 5) Build and promote image
    - Push to staging branch to build and validate.
-   - Promote to production by pushing git tag deploy-prod-<customer-id>-<version>.
-   - Pipeline ensures image:tag exists (or re-tags by digest) and updates Cloud Run via Terraform with image_tag=<version>.
+   - Promote to production by pushing git tag deploy-prod-`<customer-id>`-`<version>`.
+   - Pipeline ensures image:tag exists (or re-tags by digest) and updates Cloud Run via Terraform with image_tag=`<version>`.
 6) Ongoing operations
    - Secret rotation: push new secret versions; Cloud Run uses version "latest" automatically.
    - Infra changes: update module or customer env and run Terraform apply via CI with manual approval.
@@ -405,7 +405,7 @@ Key configuration updates and interfaces
 - Outputs
   - cloud_run_url, runtime_service_account_email, project_id
 - Backend and remote state
-  - Use GCS backend per env with path prefix envs/staging, envs/customers/<id> to isolate states.
+  - Use GCS backend per env with path prefix envs/staging, envs/customers/`<id>` to isolate states.
 
 
 Critical architectural decisions and impacts
@@ -459,7 +459,7 @@ Actions you can take next
 2) Implement infra/envs/platform and apply it once to create WIF, AR, and state bucket.
 3) Implement modules/customer-stamp with providers (default + alias platform) and the resources described.
 4) Implement infra/envs/staging and run terraform apply with an initial image tag to create staging.
-5) Implement infra/envs/customers/<first-customer> with create_project=true; run apply to create infra.
+5) Implement infra/envs/customers/`<first-customer>` with create_project=true; run apply to create infra.
 6) Add GitHub Actions workflows for staging (branch push) and production (tag push) as described.
 7) Add scripts to parse tags and to add secret versions from CI.
 8) Set GitHub repository secrets for any values you intend to inject into Secret Manager during pipelines.
