@@ -29,7 +29,7 @@
   - Local workflow builds the same image name/tag you deploy to Cloud Run; can use local registry or Minikube Docker daemon.
 
 
-Recommended repository and Terraform structure
+## Recommended repository and Terraform structure
 Root at: ~/Developer/GCP/`<your-repo-name>`
 - app/
   - Dockerfile
@@ -82,10 +82,10 @@ Root at: ~/Developer/GCP/`<your-repo-name>`
 - README.md
 
 
-Customer-stamp Terraform module design
+## Customer-stamp Terraform module design
 Scope: A reusable module that encapsulates all resources for a single tenant or staging environment. It can optionally create the GCP project, enable required APIs, provision Cloud Run, IAM, and Secret Manager metadata, and grant cross-project Artifact Registry access.
 
-Files and key contents
+### Files and key contents
 - modules/customer-stamp/providers.tf
   - Define:
     - provider "google" (default): points to the target tenant project.
@@ -173,19 +173,19 @@ Files and key contents
 - modules/customer-stamp/outputs.tf
   - output "cloud_run_url" from google_cloud_run_v2_service.uri
   - output "runtime_service_account_email" from SA
-  - output "project_id"
+    - output "project_id"
 
-Key design notes and side effects
+### Key design notes and side effects
 - Creating projects requires elevated org-level permissions (resourcemanager.projectCreator and billing.projectManager or billing.user) in the platform CI SA.
 - Using central Artifact Registry introduces cross-project IAM; the module handles this via an alias provider targeting the platform project.
 - Avoid creating secret versions in Terraform to keep payloads out of state; use CI or manual gcloud to add versions.
 - Updating only the image tag via Terraform will create a new Cloud Run revision without drift in other settings.
 
 
-Platform environment (infra/envs/platform)
+## Platform environment (infra/envs/platform)
 Purpose: Bootstrap shared resources once.
 
-Files and responsibilities
+### Files and responsibilities
 - providers.tf
   - provider "google" project = var.platform_project_id
 - backend.tf
@@ -220,8 +220,9 @@ Files and responsibilities
 Critical decision: You may separate staging from platform; for simplicity keep central AR and WIF in platform project. Staging can be a separate project to avoid CI privileges overlapping with staging resources.
 
 
-Staging environment (infra/envs/staging)
-Files and logic
+## Staging environment (infra/envs/staging)
+
+### Files and logic
 - providers.tf
   - provider "google" project = var.staging_project_id
   - provider "google" alias = "platform" project = var.platform_project_id
@@ -247,13 +248,14 @@ Files and logic
       deployer_sa_email = var.deployer_sa_email
     }
 
-Side effects
+### Side effects
 - Using the module for staging provides uniform config and ensures minimum instances set to avoid cold starts.
 - Secrets must exist in the staging project Secret Manager with versions; CI can create/update versions from GitHub Secrets.
 
 
-Customer environments (infra/envs/customers/`<id>`)
-Files and logic
+## Customer environments (infra/envs/customers/`<id>`)
+
+### Files and logic
 - providers.tf
   - provider "google" default will point to var.project_id after project exists; for first run, can point to platform SA with resourcemanager permissions; Terraform can still create project using google provider with credentials at org scope
   - provider "google" alias = "platform" project = var.platform_project_id
@@ -284,14 +286,14 @@ Files and logic
       deployer_sa_email = var.deployer_sa_email
     }
 
-Side effects
+### Side effects
 - The first apply will create the project and all infra but will fail to resolve image and secret versions if they are missing. In practice:
   - Run apply once to create infra + secret metadata.
   - Add secrets versions via CI or manually.
   - Push a production tag with a version that exists in Artifact Registry to deploy the service revision.
 
 
-Key Terraform data structures (module variable examples)
+## Key Terraform data structures (module variable examples)
 - variable "secrets" example:
   - type = map(object({ secret_id = string, env_var = string }))
   - Value example:
@@ -303,14 +305,15 @@ Key Terraform data structures (module variable examples)
   - local.image = "${var.artifact_repo_location}-docker.pkg.dev/${var.platform_project_id}/${var.artifact_repo_name}/${var.image_name}:${var.image_tag}"
 
 
-CI/CD workflows (step-by-step English descriptions)
-Common elements for both pipelines
+## CI/CD workflows (step-by-step English descriptions)
+
+### Common elements for both pipelines
 - Authenticate to GCP using GitHub Actions OIDC -> WIF provider in platform project.
 - Impersonate the ci-terraform service account.
 - Configure Docker to push to Artifact Registry: gcloud auth configure-docker ${region}-docker.pkg.dev
 - Use Terraform with GCS backend; provide -backend-config or rely on backend.tf committed in envs.
 
-Staging pipeline (trigger: push to staging branch)
+### Staging pipeline (trigger: push to staging branch)
 1) Checkout repository. Derive image tag (e.g., staging-`<shortsha>`).
 2) OIDC authenticate to GCP WIF and impersonate ci-terraform@platform.
 3) Build container:
@@ -325,7 +328,7 @@ Staging pipeline (trigger: push to staging branch)
    - This updates the Cloud Run service to the new image tag; min-instances = 1 ensures no cold starts.
 7) Output the Cloud Run URL for visibility.
 
-Production pipeline (trigger: push of a tag deploy-prod-`<customer-id>`-`<version>`)
+### Production pipeline (trigger: push of a tag deploy-prod-`<customer-id>`-`<version>`)
 1) Checkout repository. Parse tag into:
    - CUSTOMER_ID and VERSION. Enforce regex ^deploy-prod-([a-z0-9-]+)-(.+)$
 2) OIDC authenticate to GCP WIF and impersonate ci-terraform@platform.
@@ -343,7 +346,7 @@ Production pipeline (trigger: push of a tag deploy-prod-`<customer-id>`-`<versio
 Important production practice: Prefer deploying by image digest (immutable) rather than tag. You can pass image_digest as a variable and set container image to @sha256:... for perfect reproducibility, while still tagging VERSION for human readability.
 
 
-Local development on Kubernetes (Minikube or Docker Desktop Kubernetes)
+## Local development on Kubernetes (Minikube or Docker Desktop Kubernetes)
 - Build and run the same container image locally.
 - Options:
   - Minikube: eval $(minikube docker-env) then docker build -t app:dev . and reference image: app:dev in kustomize overlay.
@@ -357,14 +360,14 @@ Local development on Kubernetes (Minikube or Docker Desktop Kubernetes)
 - Optional: Use Skaffold to automate build/push/apply loops with profiles for local.
 
 
-Secrets and “build in public” model
+## Secrets and "build in public" model
 - Terraform resources for secrets only include names (metadata). Do not create versions in Terraform to avoid plaintext in state.
 - CI uses GitHub Actions Secrets to inject values into GCP Secret Manager via gcloud secrets versions add.
 - Local Terraform execution uses a git-ignored .tfvars for any required sensitive variable values that are not secrets themselves, or you can run a one-time CLI to add secret versions.
 - Cloud Run services read secrets via env.valueSource.secretKeyRef with version "latest" to pick up secret rotations automatically.
 
 
-Lifecycle of a new customer (best-practice workflow)
+## Lifecycle of a new customer (best-practice workflow)
 1) Naming and configuration
    - Choose customer_id (lowercase, hyphenated) to fit GCP naming constraints.
    - Create infra/envs/customers/`<customer-id>`/ with main.tf, variables.tf, backend.tf.
@@ -391,7 +394,7 @@ Lifecycle of a new customer (best-practice workflow)
    - Infra changes: update module or customer env and run Terraform apply via CI with manual approval.
 
 
-Key configuration updates and interfaces
+## Key configuration updates and interfaces
 - Provider configuration patterns
   - Default provider targets the tenant project; alias provider "platform" targets the platform project for AR IAM and WIF bindings.
 - Module interface (essential variables)
@@ -408,7 +411,7 @@ Key configuration updates and interfaces
   - Use GCS backend per env with path prefix envs/staging, envs/customers/`<id>` to isolate states.
 
 
-Critical architectural decisions and impacts
+## Critical architectural decisions and impacts
 - Centralized Artifact Registry vs per-project registries
   - Selected centralized repository in platform project for cost and operational simplicity.
   - Impact: cross-project IAM needed; module handles this. Alternative: per-project AR increases isolation but adds cost and overhead.
@@ -421,10 +424,10 @@ Critical architectural decisions and impacts
 - Project creation inside the module
   - Simplifies onboarding; requires elevated roles for CI SA and careful control over module use. If you prefer, separate project creation into its own “project-factory” module and keep customer-stamp scoped to in-project resources only.
 - Image promotion by digest
-  - Strongly recommended for reproducibility; tag is for UX. Impact: you’ll store and pass digests (e.g., via release notes or artifact file) in production pipelines.
+  - Strongly recommended for reproducibility; tag is for UX. Impact: you'll store and pass digests (e.g., via release notes or artifact file) in production pipelines.
 
 
-Minimal short code snippets (illustrative, not full)
+## Minimal short code snippets (illustrative, not full)
 - Module usage (staging)
   - module "staging" {
       source = "../../modules/customer-stamp"
@@ -454,7 +457,7 @@ Minimal short code snippets (illustrative, not full)
   - local.image = "${var.artifact_repo_location}-docker.pkg.dev/${var.platform_project_id}/${var.artifact_repo_name}/${var.image_name}:${var.image_tag}"
 
 
-Actions you can take next
+## Actions you can take next
 1) Create the repository scaffold and commit it.
 2) Implement infra/envs/platform and apply it once to create WIF, AR, and state bucket.
 3) Implement modules/customer-stamp with providers (default + alias platform) and the resources described.
